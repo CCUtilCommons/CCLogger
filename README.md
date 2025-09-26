@@ -32,25 +32,20 @@
 ## 使用示例
 
 ```cpp
-#include "cc_logger.h"
-#include "console_logger_io.h"
-#include "file_logger_io.h"
+#include "CCLogger.hpp"
+#include "io/fileio.h"
 #include "formater.h"
 
 using namespace Clog;
 
 int main() {
-    CCLogger logger(
-        std::make_unique<SimpleFormatter>(),
-        std::make_unique<ConsoleLoggerIO>());
+    CCLogger logger;
 
-    // 添加文件后端
     logger.registerIOBackEnd(std::make_unique<FileLoggerIO>("app.log"));
 
     logger.log("Hello CCLogger", CCLoggerLevel::INFO);
     logger.log("Something went wrong", CCLoggerLevel::ERROR);
 
-    // 屏蔽默认后端，只写入已注册的 backends
     logger.setDefBackendSilent(true);
 }
 ```
