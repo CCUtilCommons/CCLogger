@@ -1,13 +1,23 @@
 #include "CCLogger.hpp"
 #include "CCLogger_default_behave.h"
+#include "CCThreadPool.h"
 #include "logger_level.h"
 #include <algorithm>
 #include <memory>
 using namespace Clog;
 
+void ThreadPoolDeleter::operator()(CCThreadPool::CCThreadPool* ptr) const {
+	delete ptr; // shutdown the thread pool
+}
+
 CCLogger::CCLogger() {
 	this->formater = provide_default_formater();
 	this->default_io = provide_default_io();
+
+	// Ok provide a pools
+	log_worker_pool = std::unique_ptr<CCThreadPool::CCThreadPool, ThreadPoolDeleter>(
+	    new CCThreadPool::CCThreadPool(
+	        std::make_unique<CCThreadPool::ThreadCountDefaultProvider>()));
 }
 
 CCLogger::CCLogger(
@@ -25,32 +35,52 @@ CCLogger::CCLogger(
 	} else {
 		this->formater = std::move(formater);
 	}
+
+	// Ok provide a pools
+	log_worker_pool = std::unique_ptr<CCThreadPool::CCThreadPool, ThreadPoolDeleter>(
+	    new CCThreadPool::CCThreadPool(
+	        std::make_unique<CCThreadPool::ThreadCountDefaultProvider>()));
+}
+
+CCLogger::~CCLogger() {
+	for (const auto& io : broadcast_io) {
+		io->flush();
+	}
 }
 
 void CCLogger::log(const std::string& msg,
                    const CCLoggerLevel level,
                    std::source_location loc) {
+	auto task = [this,
+	             msg_copy = msg,
+	             level,
+	             loc]() mutable {
+		this->log_direct(msg_copy, level, loc);
+	};
 
-	auto formats = formater->format(
-	    msg, level, loc);
-
-	std::lock_guard<std::mutex> _(io_manager_locker);
-	default_io->write_logger(formats);
-	for (auto& io : broadcast_io) {
-		io->write_logger(formats);
+	try {
+		log_worker_pool->enTask(std::move(task));
+	} catch (const ThreadPoolTerminateError& e) {
+		this->log_direct(msg, level, loc);
+	} catch (...) {
+		this->log_direct(msg, level, loc);
 	}
 }
 
 void CCLogger::log(std::string&& msg,
                    const CCLoggerLevel level,
                    std::source_location loc) {
-	auto formats = formater->format(
-	    msg, level, loc);
+	auto task = [this,
+	             msg_moved = std::move(msg), // 移动 msg，避免复制
+	             level,
+	             loc]() mutable {
+		this->log_direct(std::move(msg_moved), level, loc);
+	};
 
-	std::lock_guard<std::mutex> _(io_manager_locker);
-	default_io->write_logger(formats);
-	for (auto& io : broadcast_io) {
-		io->write_logger(formats);
+	try {
+		log_worker_pool->enTask(std::move(task));
+	} catch (...) {
+		// Abolished the logger sessions
 	}
 }
 
@@ -62,9 +92,24 @@ void CCLogger::log_direct(const std::string& msg,
 	    msg, level, loc);
 
 	std::lock_guard<std::mutex> _(io_manager_locker);
-	default_io->write_logger(formats);
-	for (auto& io : broadcast_io) {
-		io->write_logger(formats);
+	if (!silent_defbackend)
+		default_io->write_logger(formats);
+
+	for (auto& io_ptr : broadcast_io) {
+		std::string formats_copy = formats;
+		LoggerIO* target_io = io_ptr.get();
+
+		auto broadcast_task = [this,
+		                       formats_copy = std::move(formats_copy), // 移动复制的字符串
+		                       target_io]() {
+			target_io->write_logger(formats_copy);
+		};
+
+		try {
+			log_worker_pool->enTask(std::move(broadcast_task));
+		} catch (...) {
+			target_io->write_logger(formats_copy);
+		}
 	}
 }
 
@@ -72,12 +117,27 @@ void CCLogger::log_direct(std::string&& msg,
                           const CCLoggerLevel level,
                           std::source_location loc) {
 	auto formats = formater->format(
-	    msg, level, loc);
-
+	    std::move(msg), level, loc);
 	std::lock_guard<std::mutex> _(io_manager_locker);
-	default_io->write_logger(formats);
-	for (auto& io : broadcast_io) {
-		io->write_logger(formats);
+	if (!silent_defbackend)
+		default_io->write_logger(formats);
+
+	// broadcast to multi backends
+	for (auto& io_ptr : broadcast_io) {
+		std::string formats_copy = formats;
+		LoggerIO* target_io = io_ptr.get();
+
+		auto broadcast_task = [this,
+		                       formats_copy = std::move(formats_copy), // 移动复制的字符串
+		                       target_io]() {
+			target_io->write_logger(formats_copy);
+		};
+
+		try {
+			log_worker_pool->enTask(std::move(broadcast_task));
+		} catch (...) {
+			target_io->write_logger(formats_copy);
+		}
 	}
 }
 

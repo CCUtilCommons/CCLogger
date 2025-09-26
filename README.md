@@ -1,3 +1,102 @@
 # CCLogger
 
-TODO
+一个基于 **C++20** 的高性能日志库，面向高并发场景设计。  
+它支持可插拔的日志格式化器与输出后端，并通过线程池驱动实现异步写入。  
+
+### 特性
+- 🔌 **可插拔后端**：支持 `LoggerIO` 动态注册/移除（文件/控制台/自定义）  
+- 🧵 **异步线程池**：日志写入与业务线程解耦，提升并发吞吐  
+- 📡 **多后端广播**：一条日志可同时写入多个后端  
+- 📍 **源位置信息**：自动捕获文件、行号、函数名  
+- ⚡ **高吞吐性能**：单机可达 20W+ logs/sec（多线程下）
+- 🏎 **流式接口**：支持链式 `<<`，一次 flush，性能优于每次插入 flush 
+---
+
+## 接口说明
+
+### 公共方法一览
+
+| 方法 | 参数 | 说明 |
+|------|------|------|
+| `CCLogger()` | - | 使用默认格式化器与输出后端构造 |
+| `CCLogger(std::unique_ptr<LoggerFormatter>, std::unique_ptr<LoggerIO>)` | `formater`：日志格式化器<br>`default_io`：默认输出后端 | 自定义构造器 |
+| `void log(const std::string&, CCLoggerLevel, std::source_location)` | `msg`：日志内容<br>`level`：日志级别<br>`loc`：源位置信息 | 打印日志（拷贝字符串） |
+| `void log(std::string&&, CCLoggerLevel, std::source_location)` | 同上 | 打印日志（右值引用，避免拷贝） |
+| `void registerIOBackEnd(std::unique_ptr<LoggerIO>)` | `backend`：新的日志后端 | 动态注册额外输出 |
+| `bool removeIOBackEnd(LoggerIO* backend)` | `backend`：待移除的后端指针 | 移除日志后端，返回是否成功 |
+| `bool defBackendSilent() const` | - | 获取是否屏蔽默认后端 |
+| `void setDefBackendSilent(bool)` | `true/false` | 设置是否屏蔽默认后端 |
+
+---
+
+## 使用示例
+
+```cpp
+#include "cc_logger.h"
+#include "console_logger_io.h"
+#include "file_logger_io.h"
+#include "formater.h"
+
+using namespace Clog;
+
+int main() {
+    CCLogger logger(
+        std::make_unique<SimpleFormatter>(),
+        std::make_unique<ConsoleLoggerIO>());
+
+    // 添加文件后端
+    logger.registerIOBackEnd(std::make_unique<FileLoggerIO>("app.log"));
+
+    logger.log("Hello CCLogger", CCLoggerLevel::INFO);
+    logger.log("Something went wrong", CCLoggerLevel::ERROR);
+
+    // 屏蔽默认后端，只写入已注册的 backends
+    logger.setDefBackendSilent(true);
+}
+```
+
+更多的样例可以参考example文件夹下的example代码！
+
+
+## 流式接口支持
+
+`LoggerStream` 提供链式流式日志接口
+
+### 使用示例
+
+```cpp
+#include "LoggerStream.h"
+
+int main() {
+    using namespace Clog;
+
+    trace << "Hello" << "World!" << 123 << std::endl;
+    debug << "user=" << 123 << " action=login" << std::endl;
+    info  << "File loaded: " << "config.yaml" << std::endl;
+    error << "Something went wrong, errno=" << 5 << std::endl;
+    debug << "User=" << 42 << " performed action" << std::endl;
+}
+```
+
+## 性能表现
+### FileLoggerIO（写文件）
+| threads | tasks_per_thread | total_tasks | time_s | tps     |
+| ------- | ---------------- | ----------- | ------ | ------- |
+| 1       | 200000           | 200000      | 8.72   | 22930.8 |
+| 2       | 100000           | 200000      | 1.53   | 130427  |
+| 4       | 50000            | 200000      | 1.39   | 143774  |
+| 8       | 25000            | 200000      | 1.34   | 149706  |
+| 16      | 12500            | 200000      | 0.97   | 206795  |
+| 32      | 6250             | 200000      | 0.82   | 244265  |
+
+### NullLoggerIO（丢弃日志）
+
+| threads | tasks_per_thread | total_tasks | time_s | tps     |
+| ------- | ---------------- | ----------- | ------ | ------- |
+| 1       | 1000000          | 1000000     | 43.27  | 23111.5 |
+| 2       | 500000           | 1000000     | 7.33   | 136434  |
+| 4       | 250000           | 1000000     | 6.84   | 146301  |
+| 8       | 125000           | 1000000     | 6.57   | 152173  |
+| 16      | 62500            | 1000000     | 4.81   | 207910  |
+| 32      | 31250            | 1000000     | 3.68   | 272075  |
+| 64      | 15625            | 1000000     | 3.82   | 262104  |

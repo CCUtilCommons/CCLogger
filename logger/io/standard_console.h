@@ -8,8 +8,6 @@
  *
  */
 class StandardConsoleIO : public Clog::LoggerIO {
-	// console IO no need to be ready
-	bool process_enable_io() override { return true; }
 	bool write_logger(const std::string& log_info) override;
 	bool flush() override;
 };
