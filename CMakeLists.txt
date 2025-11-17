@@ -9,7 +9,7 @@ FetchContent_Declare(
     CCThreadPool
     GIT_REPOSITORY https://github.com/CCUtilCommons/CCThreadPool.git
     GIT_TAG main
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/middlewares
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/middlewares
 )
 
 option(USE_STANDARD_FORMATTER "Use Standard Formatter" ON)
