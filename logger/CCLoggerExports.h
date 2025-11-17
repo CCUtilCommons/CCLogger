@@ -5,14 +5,11 @@
 #define CCLOG_PLATFORM_WINDOWS
 #endif
 
-// ---- Export / Import ----
 #if defined(CCLOG_PLATFORM_WINDOWS)
 #if defined(CCLOG_BUILD_SHARED)
 #define CCLOG_API __declspec(dllexport)
-#elif defined(CCLOG_USE_SHARED)
-#define CCLOG_API __declspec(dllimport)
 #else
-#define CCLOG_API // static lib or not exporting
+#define CCLOG_API __declspec(dllimport)
 #endif
 #else
 // GCC/Clang: use visibility attributes
