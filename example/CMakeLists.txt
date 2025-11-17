@@ -1,5 +1,5 @@
-add_executable(example example.cc)
-target_link_libraries(example PRIVATE CCLogger)
+add_executable(cclogger_example example.cc)
+target_link_libraries(cclogger_example PRIVATE CCLogger)
 
-add_executable(example_multi_backend example_multi_backend.cc)
-target_link_libraries(example_multi_backend PRIVATE CCLogger)
+add_executable(cclogger_example_multi_backend example_multi_backend.cc)
+target_link_libraries(cclogger_example_multi_backend PRIVATE CCLogger)
