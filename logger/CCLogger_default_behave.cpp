@@ -1,10 +1,14 @@
 #include "CCLogger_default_behave.h"
 #include "decorator/console_color_decorator.h"
 #include "formater.h"
-#include "formater/simplify_formarter.h"
-#include "formater/standard_formater.h"
 #include "io/standard_console.h"
 #include <memory>
+
+#ifdef USE_STANDARD_FORMATTER
+#include "formater/standard_formater.h"
+#else
+#include "formater/simplify_formarter.h"
+#endif
 
 using namespace Clog;
 
