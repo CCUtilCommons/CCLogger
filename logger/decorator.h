@@ -1,9 +1,11 @@
 #pragma once
+#include "CCLoggerExports.h"
 #include "logger_level.h"
 #include <memory>
 #include <string>
+
 namespace Clog {
-class LoggerDecorator {
+class CCLOG_API LoggerDecorator {
 public:
 	virtual ~LoggerDecorator() = default;
 	LoggerDecorator(std::unique_ptr<LoggerDecorator> next = nullptr)

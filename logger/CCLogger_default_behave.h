@@ -6,5 +6,6 @@ namespace Clog {
 
 std::unique_ptr<LoggerIO> provide_default_io();
 std::unique_ptr<LoggerFormatter> provide_default_formater();
+std::unique_ptr<LoggerFormatter> provide_blank_formater();
 
 }

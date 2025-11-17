@@ -17,14 +17,24 @@ file(GLOB_RECURSE LoggerBasicComponentsSrc
     "${CMAKE_CURRENT_SOURCE_DIR}/utils/*.hpp"
 )
 
+message("Requesting All static library -fPIC...")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 message("Configuring the must library of CCLogger: LoggerBasicComponents")
 add_library(LoggerBasicComponents ${LoggerBasicComponentsSrc})
 target_include_directories(LoggerBasicComponents PUBLIC .)
 message("Configuring the must library of CCLogger: LoggerBasicComponents OK")
 
 message("Configuring the library of CCLogger: CCLogger")
-set(LoggerSrc CCLogger.cc CCLogger.hpp formater.cpp CCLogger_default_behave.cpp CCLoggerStream.cc)
-add_library(CCLogger ${LoggerSrc})
+set(LoggerSrc CCLogger.cc CCLogger.hpp formater.cpp CCLogger_default_behave.cpp)
+add_library(CCLogger SHARED ${LoggerSrc})
 target_link_libraries(CCLogger PUBLIC LoggerBasicComponents CCXXThreadPool)
 message("Configuring the library of CCLogger: CCLogger OK")
+
+# EXPORT macro: export when building
+target_compile_definitions(CCLogger PRIVATE CCLOG_BUILD_SHARED)
+
+# Optional: hide all symbols except CCLOG_API
+if(NOT WIN32)
+    target_compile_options(CCLogger PRIVATE "-fvisibility=hidden")
+endif()
 

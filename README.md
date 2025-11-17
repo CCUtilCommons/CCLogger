@@ -9,7 +9,6 @@
 - 📡 **多后端广播**：一条日志可同时写入多个后端  
 - 📍 **源位置信息**：自动捕获文件、行号、函数名  
 - ⚡ **高吞吐性能**：单机可达 20W+ logs/sec（多线程下）
-- 🏎 **流式接口**：支持链式 `<<`，一次 flush，性能优于每次插入 flush 
 ---
 
 ## 接口说明
@@ -52,26 +51,6 @@ int main() {
 
 更多的样例可以参考example文件夹下的example代码！
 
-
-## 流式接口支持
-
-`LoggerStream` 提供链式流式日志接口
-
-### 使用示例
-
-```cpp
-#include "LoggerStream.h"
-
-int main() {
-    using namespace Clog;
-
-    trace << "Hello" << "World!" << 123 << std::endl;
-    debug << "user=" << 123 << " action=login" << std::endl;
-    info  << "File loaded: " << "config.yaml" << std::endl;
-    error << "Something went wrong, errno=" << 5 << std::endl;
-    debug << "User=" << 42 << " performed action" << std::endl;
-}
-```
 
 ## 性能表现
 ### FileLoggerIO（写文件）

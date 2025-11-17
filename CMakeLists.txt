@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(CCLogger LANGUAGES CXX VERSION 1.0.0)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE "Debug")
 
@@ -14,7 +14,8 @@ FetchContent_Declare(
 )
 
 option(USE_STANDARD_FORMATTER "Use Standard Formatter" ON)
-
+message("Requesting All static library -fPIC...")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 message("==================== Get the Third Party Middlewares ====================")
 FetchContent_MakeAvailable(CCThreadPool)
 message("==================== Get the Third Party Middlewares End ====================")

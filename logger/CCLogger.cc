@@ -1,5 +1,6 @@
 #include "CCLogger.hpp"
 #include "CCLogger_default_behave.h"
+#include "CCSourceLocation.h"
 #include "CCThreadPool.h"
 #include "logger_level.h"
 #include <algorithm>
@@ -44,10 +45,11 @@ CCLogger::CCLogger(
 
 CCLogger::~CCLogger() {
 	for (const auto& io : broadcast_io) {
-		io->flush();
+		io.first->flush();
 	}
 }
 
+#if __cplusplus >= 202002L
 void CCLogger::log(const std::string& msg,
                    const CCLoggerLevel level,
                    std::source_location loc) {
@@ -97,10 +99,12 @@ void CCLogger::log_direct(const std::string& msg,
 
 	for (auto& io_ptr : broadcast_io) {
 		std::string formats_copy = formats;
-		LoggerIO* target_io = io_ptr.get();
+		LoggerIO* target_io = io_ptr.first.get();
+		formats = io_ptr.second->format(
+		    std::move(msg), level, loc);
 
 		auto broadcast_task = [this,
-		                       formats_copy = std::move(formats_copy), // 移动复制的字符串
+		                       formats_copy,
 		                       target_io]() {
 			target_io->write_logger(formats_copy);
 		};
@@ -117,18 +121,86 @@ void CCLogger::log_direct(std::string&& msg,
                           const CCLoggerLevel level,
                           std::source_location loc) {
 	auto formats = formater->format(
-	    std::move(msg), level, loc);
+	    msg, level, loc);
 	std::lock_guard<std::mutex> _(io_manager_locker);
 	if (!silent_defbackend)
 		default_io->write_logger(formats);
 
 	// broadcast to multi backends
 	for (auto& io_ptr : broadcast_io) {
-		std::string formats_copy = formats;
-		LoggerIO* target_io = io_ptr.get();
+		LoggerIO* target_io = io_ptr.first.get();
+		std::string formats_copy = io_ptr.second->format(
+		    std::move(msg), level, loc);
 
 		auto broadcast_task = [this,
-		                       formats_copy = std::move(formats_copy), // 移动复制的字符串
+		                       formats_copy,
+		                       target_io]() {
+			target_io->write_logger(formats_copy);
+		};
+
+		try {
+			log_worker_pool->enTask(std::move(broadcast_task));
+		} catch (...) {
+			target_io->write_logger(formats_copy);
+		}
+	}
+}
+#endif
+
+void CCLogger::log(const std::string& msg,
+                   const CCLoggerLevel level,
+                   const CCSourceLocation& loc) {
+	auto task = [this,
+	             msg_copy = msg,
+	             level,
+	             loc]() mutable {
+		this->log_direct(msg_copy, level, loc);
+	};
+
+	try {
+		log_worker_pool->enTask(std::move(task));
+	} catch (const ThreadPoolTerminateError& e) {
+		this->log_direct(msg, level, loc);
+	} catch (...) {
+		this->log_direct(msg, level, loc);
+	}
+}
+
+void CCLogger::log(std::string&& msg,
+                   const CCLoggerLevel level,
+                   const CCSourceLocation& loc) {
+	auto task = [this,
+	             msg_moved = std::move(msg),
+	             level,
+	             loc]() mutable {
+		this->log_direct(std::move(msg_moved), level, loc);
+	};
+
+	try {
+		log_worker_pool->enTask(std::move(task));
+	} catch (...) {
+		// Abolished the logger sessions
+	}
+}
+
+void CCLogger::log_direct(const std::string& msg,
+                          const CCLoggerLevel level,
+                          const CCSourceLocation& loc) {
+
+	auto formats = formater->format(
+	    msg, level, loc);
+
+	std::lock_guard<std::mutex> _(io_manager_locker);
+	if (!silent_defbackend)
+		default_io->write_logger(formats);
+
+	for (auto& io_ptr : broadcast_io) {
+		LoggerIO* target_io = io_ptr.first.get();
+		std::string formats_copy = io_ptr.second->format(
+		    std::move(msg), level, loc);
+
+		auto broadcast_task = [this,
+		                       formats_copy,
 		                       target_io]() {
 			target_io->write_logger(formats_copy);
 		};
@@ -141,17 +213,47 @@ void CCLogger::log_direct(std::string&& msg,
 	}
 }
 
-void CCLogger::registerIOBackEnd(std::unique_ptr<LoggerIO> backend) {
+void CCLogger::log_direct(std::string&& msg,
+                          const CCLoggerLevel level,
+                          const CCSourceLocation& loc) {
+	auto formats = formater->format(
+	    msg, level, loc);
 	std::lock_guard<std::mutex> _(io_manager_locker);
-	broadcast_io.emplace_back(std::move(backend));
+	if (!silent_defbackend)
+		default_io->write_logger(formats);
+
+	// broadcast to multi backends
+	for (auto& io_ptr : broadcast_io) {
+		LoggerIO* target_io = io_ptr.first.get();
+		std::string formats_copy = io_ptr.second->format(
+		    std::move(msg), level, loc);
+		auto broadcast_task = [this,
+		                       formats_copy,
+		                       target_io]() {
+			target_io->write_logger(formats_copy);
+		};
+
+		try {
+			log_worker_pool->enTask(std::move(broadcast_task));
+		} catch (...) {
+			target_io->write_logger(formats_copy);
+		}
+	}
+}
+
+void CCLogger::registerIOBackEnd(std::unique_ptr<LoggerIO> backend, std::unique_ptr<LoggerFormatter> formater) {
+	std::lock_guard<std::mutex> _(io_manager_locker);
+	broadcast_io.insert(
+	    std::make_pair(std::move(backend), std::move(formater)));
 }
 
 bool CCLogger::removeIOBackEnd(LoggerIO* backend) {
 	std::lock_guard<std::mutex> lg(io_manager_locker);
+
 	auto it = std::find_if(
 	    broadcast_io.begin(), broadcast_io.end(),
-	    [&](const std::unique_ptr<LoggerIO>& p) {
-		    return p.get() == backend;
+	    [&](const auto& pair) {
+		    return pair.first.get() == backend;
 	    });
 	if (it != broadcast_io.end()) {
 		broadcast_io.erase(it);

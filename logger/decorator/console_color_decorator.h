@@ -1,11 +1,11 @@
 #pragma once
+#include "CCLoggerExports.h"
 #include "decorator.h"
 #include "logger_level.h"
 #include <memory>
-
 namespace Clog {
 
-class ConsoleColorDecorator : public LoggerDecorator {
+class CCLOG_API ConsoleColorDecorator : public LoggerDecorator {
 public:
 	ConsoleColorDecorator(std::unique_ptr<LoggerDecorator> log = nullptr)
 	    : LoggerDecorator(std::move(log)) { }

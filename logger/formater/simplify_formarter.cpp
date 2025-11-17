@@ -1,10 +1,13 @@
 #include "simplify_formarter.h"
 #include "logger_level.h"
 #include <chrono>
-#include <format>
 #include <iomanip>
-#include <source_location>
 #include <sstream>
+
+#if __cplusplus > 202002L
+#include <format>
+#include <source_location>
+#endif
 
 namespace Clog {
 
@@ -75,6 +78,7 @@ namespace {
 	}
 }
 
+#if __cplusplus > 202002L
 std::string SimplifiedFormater::format(
     const std::string& msg, const CCLoggerLevel level,
     const std::source_location& context_info) {
@@ -104,6 +108,40 @@ std::string SimplifiedFormater::format(
 std::string SimplifiedFormater::format(
     std::string&& msg, const CCLoggerLevel level,
     const std::source_location& context_info) {
+	return format(static_cast<const std::string&>(msg), level, context_info);
+}
+#endif
+
+std::string SimplifiedFormater::format(
+    const std::string& msg, const CCLoggerLevel level,
+    const CCSourceLocation& context_info) {
+	std::string time_s = format_time_hms_ms(std::chrono::system_clock::now());
+	std::string lvl_char(1, level_to_char(level));
+
+	std::string file_name = context_info.file_name();
+	std::string file_basename = basename_or_tail(file_name.c_str());
+	std::ostringstream file_line_ss;
+	file_line_ss << file_basename << ":" << context_info.line();
+	std::string file_line = ellipsize_tail(file_line_ss.str(), FILE_LINE_WIDTH);
+
+	std::string func = ellipsize_tail(context_info.function_name(), FUNC_WIDTH);
+
+	std::ostringstream body_ss;
+
+	body_ss << std::left << std::setw(TIME_WIDTH) << time_s << "|"
+	        << std::left << std::setw(LEVEL_COL_WIDTH) << lvl_char << "|"
+	        << std::left << std::setw(FILE_LINE_WIDTH) << file_line << "|"
+	        << std::left << std::setw(FUNC_WIDTH) << func << "|"
+	        << msg;
+
+	std::string body = body_ss.str();
+
+	return run_decorate(body, level);
+}
+
+std::string SimplifiedFormater::format(
+    std::string&& msg, const CCLoggerLevel level,
+    const CCSourceLocation& context_info) {
 	return format(static_cast<const std::string&>(msg), level, context_info);
 }
 

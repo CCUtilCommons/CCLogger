@@ -1,0 +1,1 @@
+[32m2025-11-17 22:32:42.218 | [Info]    | example_multi_backend.cc:14    | int main()           | This is an info message[0m

@@ -1,6 +1,7 @@
 #pragma once
+#include "CCLoggerExports.h"
 namespace Clog {
-enum class CCLoggerLevel {
+enum class CCLOG_API CCLoggerLevel {
 	Trace,
 	Debug,
 	Info,

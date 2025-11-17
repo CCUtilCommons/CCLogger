@@ -1,4 +1,5 @@
 #pragma once
+#include "CCLoggerExports.h"
 #include <string>
 
 namespace Clog {
@@ -7,7 +8,7 @@ namespace Clog {
  *          by given formatted strings
  *
  */
-class LoggerIO {
+class CCLOG_API LoggerIO {
 public:
 	virtual ~LoggerIO() = default;
 	/**
