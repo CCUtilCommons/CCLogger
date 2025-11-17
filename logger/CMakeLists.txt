@@ -25,7 +25,7 @@ target_include_directories(LoggerBasicComponents PUBLIC .)
 message("Configuring the must library of CCLogger: LoggerBasicComponents OK")
 
 message("Configuring the library of CCLogger: CCLogger")
-set(LoggerSrc CCLogger.cc CCLogger.hpp formater.cpp CCLogger_default_behave.cpp)
+set(LoggerSrc CCLogger.cc CCLogger.hpp formater.cpp CCLogger_default_behave.cpp CCLoggerExports.h)
 add_library(CCLogger SHARED ${LoggerSrc})
 target_link_libraries(CCLogger PUBLIC LoggerBasicComponents CCXXThreadPool)
 message("Configuring the library of CCLogger: CCLogger OK")
